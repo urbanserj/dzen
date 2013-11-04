@@ -36,7 +36,7 @@ int xorig[2];
 sens_w window_sens[2];
 
 /* command types for the in-text parser */
-enum ctype  {bg, fg, icon, rect, recto, circle, circleo, pos, abspos, titlewin, ibg, fn, fixpos, ca, ba};
+enum ctype  {bg, fg, icon, rect, recto, circle, circleo, pos, abspos, titlewin, ibg, fn, fixpos, ca, ba, spring};
 
 struct command_lookup {
 	const char *name;
@@ -59,6 +59,7 @@ struct command_lookup cmd_lookup_table[] = {
 	{ "fn(",        fn,			3},
 	{ "ca(",        ca,			3},
 	{ "ba(",		ba,			3},
+	{ "sp(",		spring,		3},
 	{ 0,			0,			0}
 };
 
@@ -373,9 +374,14 @@ parse_line(const char *line, int lnr, int align, int reverse, int nodraw) {
 	int block_width = -1;
 	/* clickable area y tracking */
 	int max_y=-1;
+	/* spring pos */
+	int sp_pos = 0;
 
 	/* temp buffers */
 	char lbuf[MAX_LINE_LEN], *rbuf = NULL;
+
+	/* pointer to descination area */
+	Drawable *plnr;
 
 	/* parser state */
 	int t=-1, nobg=0;
@@ -774,6 +780,9 @@ parse_line(const char *line, int lnr, int align, int reverse, int nodraw) {
 							else
 								block_align=block_width=-1;
 							break;
+						case spring:
+							sp_pos = px;
+							break;
 					}
 					free(tval);
 				}
@@ -894,13 +903,15 @@ parse_line(const char *line, int lnr, int align, int reverse, int nodraw) {
 		}
 
 
-		if(lnr != -1) {
-			XCopyArea(dzen.dpy, pm, dzen.slave_win.drawable[lnr], dzen.gc,
-                    0, 0, dzen.w, dzen.line_height, xorig[LNR2WINDOW(lnr)], 0);
-		}
-		else {
-			XCopyArea(dzen.dpy, pm, dzen.title_win.drawable, dzen.gc,
-					0, 0, dzen.w, dzen.line_height, xorig[LNR2WINDOW(lnr)], 0);
+		plnr = (lnr != -1)?&dzen.slave_win.drawable[lnr]:&dzen.title_win.drawable;
+		if ( !sp_pos || dzen.title_win.expand ) {
+			XCopyArea(dzen.dpy, pm, *plnr, dzen.gc,
+					0, 0, dzen.w, dzen.line_height, xorig, 0);
+		} else {
+			XCopyArea(dzen.dpy, pm, *plnr, dzen.gc,
+					0, 0, sp_pos, dzen.line_height, 0, 0);
+			XCopyArea(dzen.dpy, pm, *plnr, dzen.gc,
+					sp_pos, 0, px - sp_pos, dzen.line_height, dzen.title_win.width - px + sp_pos, 0);
 		}
 		XFreePixmap(dzen.dpy, pm);
 
